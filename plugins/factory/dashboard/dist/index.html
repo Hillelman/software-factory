@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <title>Factory Board</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a flash.
+      try {
+        const t = localStorage.getItem('factory.theme') || 'system';
+        const dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+      } catch {}
+    </script>
+    <script type="module" crossorigin src="./assets/index-BgRv8_s2.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BplRocGP.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "stuck-step-watchdog",
+    "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/factory\" watchdog --interval 30",
+    "description": "Alerts (sound + notification) when a factory workflow step runs longer than the configured threshold",
+    "when": "always"
+  }
+]

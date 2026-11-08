@@ -1,0 +1,27 @@
+{
+  "name": "factory",
+  "displayName": "Software Factory",
+  "version": "0.1.0",
+  "description": "Refine requirements, orchestrate parallel task agents (builder → cleaner → checker → tester → approver) in git worktrees, merge their PRs into an orchestrator branch, and track everything on a live kanban dashboard.",
+  "author": { "name": "Hillel Garcia" },
+  "license": "MIT",
+  "keywords": ["orchestration", "agents", "kanban", "worktrees", "pull-requests"],
+  "userConfig": {
+    "port": {
+      "type": "number",
+      "title": "Dashboard port",
+      "description": "Port the kanban dashboard listens on (the next free port is used if it is taken).",
+      "default": 4317,
+      "min": 1024,
+      "max": 65535
+    },
+    "stuck_minutes": {
+      "type": "number",
+      "title": "Stuck step threshold (minutes)",
+      "description": "Send a sound and visual notification when a workflow step runs longer than this.",
+      "default": 7,
+      "min": 1,
+      "max": 120
+    }
+  }
+}

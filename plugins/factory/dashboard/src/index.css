@@ -1,0 +1,134 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.955 0 0);
+  --muted-foreground: oklch(0.52 0 0);
+  --accent: oklch(0.96 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.915 0 0);
+  --input: oklch(0.915 0 0);
+  --ring: oklch(0.708 0 0);
+  --column: oklch(0.965 0 0);
+
+  --status-backlog: oklch(0.55 0.02 260);
+  --status-progress: oklch(0.58 0.19 255);
+  --status-error: oklch(0.6 0.22 25);
+  --status-approved: oklch(0.65 0.15 155);
+  --status-merged: oklch(0.56 0.2 295);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.195 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.25 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --column: oklch(0.17 0 0);
+
+  --status-backlog: oklch(0.7 0.02 260);
+  --status-progress: oklch(0.7 0.16 255);
+  --status-error: oklch(0.7 0.19 25);
+  --status-approved: oklch(0.75 0.15 155);
+  --status-merged: oklch(0.72 0.17 295);
+}
+
+@theme inline {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-column: var(--column);
+  --color-status-backlog: var(--status-backlog);
+  --color-status-progress: var(--status-progress);
+  --color-status-error: var(--status-error);
+  --color-status-approved: var(--status-approved);
+  --color-status-merged: var(--status-merged);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Radix unmounts closed overlays and waits for exit animations, so these are keyframes. */
+@keyframes sheet-in { from { transform: translateX(100%); } }
+@keyframes sheet-out { to { transform: translateX(100%); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes pop-in { from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); } }
+.anim-sheet[data-state='open'] { animation: sheet-in 280ms cubic-bezier(0.32, 0.72, 0, 1); }
+.anim-sheet[data-state='closed'] { animation: sheet-out 200ms ease-in forwards; }
+.anim-fade[data-state='open'] { animation: fade-in 200ms ease-out; }
+.anim-fade[data-state='closed'] { animation: fade-out 160ms ease-in forwards; }
+.anim-pop[data-state='open'] { animation: pop-in 180ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .anim-sheet, .anim-fade, .anim-pop { animation: none !important; }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--status-error) 45%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent; }
+}
+.animate-pulse-ring {
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-ring { animation: none; }
+}

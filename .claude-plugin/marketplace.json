@@ -1,0 +1,14 @@
+{
+  "name": "software-factory",
+  "owner": { "name": "Hillel Garcia" },
+  "metadata": {
+    "description": "An agentic software factory for Claude Code: refine requirements, split work into parallel tasks, and ship reviewed PRs."
+  },
+  "plugins": [
+    {
+      "name": "factory",
+      "source": "./plugins/factory",
+      "description": "Refine requirements, orchestrate parallel task agents (builder → cleaner → checker → tester → approver) and track them on a live kanban dashboard."
+    }
+  ]
+}

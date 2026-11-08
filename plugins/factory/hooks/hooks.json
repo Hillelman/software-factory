@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -d \"${CLAUDE_PROJECT_DIR}/.factory/tasks\" ] && cd \"${CLAUDE_PROJECT_DIR}\" && node \"${CLAUDE_PLUGIN_ROOT}/bin/factory\" watchdog --once --throttle 20 >/dev/null 2>&1; exit 0",
+            "async": true,
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

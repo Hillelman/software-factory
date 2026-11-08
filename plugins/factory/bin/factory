@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+// factory — the only writer of .factory/ state. Agents judge; this script enforces.
+// Run "factory help" for the command list.
+import { main } from '../lib/cli.mjs';
+
+process.exitCode = await main(process.argv.slice(2));
