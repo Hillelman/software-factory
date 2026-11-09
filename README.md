@@ -44,6 +44,9 @@ Actions that aren't allowed are refused with a clear message. For example, pausi
 
 ## How it works
 
+<img width="1024" height="791" alt="Screenshot 2026-11-09 at 9 32 13" src="https://github.com/user-attachments/assets/9e5dbb24-9949-40f2-8e22-d73e57385931" />
+
+
 ```
 main session (your model, effort, mode)
 └── orchestrator ── splits work, opens dashboard, spawns runners
