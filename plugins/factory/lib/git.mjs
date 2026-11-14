@@ -1,9 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
+// Shared child-process options. windowsHide stops a console window flashing on Windows for every call.
+export const childOptions = (extra = {}) => ({ windowsHide: true, ...extra });
+
 export function run(cmd, args, { cwd, allowFail = false } = {}) {
   try {
-    return execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    return execFileSync(cmd, args, childOptions({ cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })).trim();
   } catch (err) {
     if (allowFail) return null;
     const stderr = err.stderr?.toString().trim();

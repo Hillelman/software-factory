@@ -23,7 +23,7 @@ Run `factory init`. If it reports `gitignoreUpdated: true`, commit only `.gitign
 
 ## 3. Unfinished tasks
 
-Run `factory unfinished --json`. If any tasks are listed, ask **one** AskUserQuestion with `multiSelect: true`: "Which unfinished tasks should be resumed? The rest will be cancelled." Each option is `<id> · <status> · <title>` (at most 4 options per question, so batch into several questions if needed).
+Run `factory unfinished --json`. It always prints one JSON object `{"tasksInQueue": {...}, "tasks": [...]}`. Empty or non-JSON output is a CLI failure, never "no tasks": retry once with `node "<plugin>/bin/factory" unfinished --json`, and if that also fails, report the error and stop. If `tasks` is not empty, ask **one** AskUserQuestion with `multiSelect: true`: "Which unfinished tasks should be resumed? The rest will be cancelled." Each option is `<id> · <status> · <title>` (at most 4 options per question, so batch into several questions if needed).
 
 - **Resumed** tasks. The mode depends on the status:
   - `paused`: run `factory resume <id>`.

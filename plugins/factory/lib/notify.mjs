@@ -1,8 +1,9 @@
 import { spawn } from 'node:child_process';
+import { childOptions } from './git.mjs';
 
 function fire(cmd, args) {
   try {
-    const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+    const child = spawn(cmd, args, childOptions({ stdio: 'ignore', detached: true }));
     child.on('error', () => {});
     child.unref();
   } catch {

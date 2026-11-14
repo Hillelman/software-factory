@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import * as sm from './state.mjs';
 import { FactoryError } from './state.mjs';
 import { Store, DEFAULT_CONFIG } from './store.mjs';
-import { git, run, mainRoot, currentBranch, defaultBranch, dirtyFiles } from './git.mjs';
+import { git, run, mainRoot, currentBranch, childOptions, defaultBranch, dirtyFiles } from './git.mjs';
 import { nextTaskId, nextSessionId } from './ids.mjs';
 import { checkOnce } from './watchdog.mjs';
 import { detectCommands } from './detect.mjs';
@@ -275,8 +275,14 @@ function ready() {
 function unfinished(flags) {
   const store = openStore();
   const tasks = allTasks(store).filter((t) => !['merged', 'cancelled'].includes(t.status));
-  if (flags.json) console.log(JSON.stringify(tasks.map(({ id, title, status, step, run, sessionId }) => ({ id, title, status, step, run, sessionId }))));
-  else for (const t of tasks) console.log(`${t.id}  ${t.status.padEnd(11)} ${t.sessionId}  ${t.title}`);
+  const count = (status) => tasks.filter((t) => t.status === status).length;
+  const tasksInQueue = { backlog: count('backlog'), inProgress: count('in_progress'), paused: count('paused'), approved: count('approved'), errors: count('error') };
+  if (flags.json) {
+    console.log(JSON.stringify({ tasksInQueue, tasks: tasks.map(({ id, title, status, step, run, sessionId }) => ({ id, title, status, step, run, sessionId })) }));
+    return 0;
+  }
+  for (const t of tasks) console.log(`${t.id}  ${t.status.padEnd(11)} ${t.sessionId}  ${t.title}`);
+  console.log(`${tasks.length} unfinished: ${tasksInQueue.backlog} backlog, ${tasksInQueue.inProgress} in progress, ${tasksInQueue.paused} paused, ${tasksInQueue.approved} approved, ${tasksInQueue.errors} errors`);
   return 0;
 }
 
@@ -505,7 +511,7 @@ function pidAlive(pid) {
 
 function openUrl(url) {
   const [cmd, args] = process.platform === 'darwin' ? ['open', [url]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : ['xdg-open', [url]];
-  spawn(cmd, args, { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
+  spawn(cmd, args, childOptions({ stdio: 'ignore', detached: true })).on('error', () => {}).unref();
 }
 
 async function dashboard(positional) {
@@ -531,10 +537,10 @@ async function dashboard(positional) {
   }
   if (action !== 'start') throw new FactoryError('Usage: factory dashboard start|stop|url|open');
   const logFd = fs.openSync(store.path('dashboard.log'), 'a');
-  const child = spawn(process.execPath, [path.join(PLUGIN_ROOT, 'dashboard', 'server.mjs'), '--root', store.root, '--port', String(store.config().port)], {
+  const child = spawn(process.execPath, [path.join(PLUGIN_ROOT, 'dashboard', 'server.mjs'), '--root', store.root, '--port', String(store.config().port)], childOptions({
     detached: true,
     stdio: ['ignore', logFd, logFd],
-  });
+  }));
   child.unref();
   for (let i = 0; i < 50; i++) {
     await new Promise((r) => setTimeout(r, 100));
