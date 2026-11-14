@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
-import { CheckCircle2, ChevronDown, Circle, CircleX, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Circle, CircleX, MinusCircle, ExternalLink, Loader2, TriangleAlert } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { COLUMN_ACCENT } from '@/components/statusStyles';
-import { COLUMNS, columnOf, timeline, type StepState, type TimelineRun } from '@/lib/board';
+import { activeStepsOf, COLUMNS, columnOf, timeline, type StepState, type TimelineRun } from '@/lib/board';
 import { elapsedMs, formatDateTime, formatDuration, formatTime, formatTokens, STEP_LABEL } from '@/lib/format';
 import type { FactoryEvent, Step, TaskDetail, TaskSummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ const STATE_ICON: Record<StepState, React.ReactNode> = {
   passed: <CheckCircle2 className="size-4 text-status-approved" />,
   failed: <CircleX className="size-4 text-status-error" />,
   running: <Loader2 className="size-4 animate-spin text-status-progress" />,
+  skipped: <MinusCircle className="size-4 text-muted-foreground/60" />,
   pending: <Circle className="size-4 text-muted-foreground/40" />,
 };
 
@@ -45,6 +46,7 @@ function StepRow({ run, entry, report, now }: { run: number; entry: TimelineRun[
       >
         {STATE_ICON[entry.state]}
         <span className="flex-1 text-sm font-medium">{STEP_LABEL[entry.step]}</span>
+        {entry.state === 'skipped' && <span className="text-xs text-muted-foreground">Skipped</span>}
         {duration !== null && <span className="text-xs text-muted-foreground tabular-nums">{formatDuration(duration)}</span>}
         {(report || entry.errorMessage) && <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', open && 'rotate-180')} />}
       </button>
@@ -97,6 +99,7 @@ export function TaskDrawer({ task, detail, error, now, onClose }: Props) {
   const column = task ? COLUMNS.find((c) => c.id === columnOf(task.status)) : undefined;
   const runs = detail ? timeline(detail.events) : [];
   const elapsed = task ? elapsedMs(task.startedAt, task.finishedAt, now) : null;
+  const activeSteps = task ? activeStepsOf(task) : [];
 
   return (
     <Sheet open={Boolean(task)} onOpenChange={(open) => !open && onClose()}>
@@ -121,7 +124,7 @@ export function TaskDrawer({ task, detail, error, now, onClose }: Props) {
               <SheetTitle className="text-lg leading-snug font-semibold">{task.title}</SheetTitle>
               <SheetDescription className="sr-only">Workflow steps, reports and logs for {task.id}</SheetDescription>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-                <Meta label="Step">{task.step ? STEP_LABEL[task.step] : task.status === 'merged' ? 'Done' : '—'}</Meta>
+                <Meta label="Step">{activeSteps.length ? activeSteps.map((s) => STEP_LABEL[s]).join(' + ') : task.status === 'merged' ? 'Done' : '—'}</Meta>
                 <Meta label="Run">
                   {task.run}/{task.maxRuns}
                 </Meta>

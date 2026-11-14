@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TaskCard } from './TaskCard';
+import { StepDots } from './StepDots';
 import { Board } from './Board';
 import { QrDialog } from './QrDialog';
 import { TooltipProvider } from './ui/tooltip';
@@ -91,5 +92,26 @@ describe('QrDialog', () => {
     render(<QrDialog urls={[]} />);
     await userEvent.click(screen.getByRole('button', { name: 'Open on your phone' }));
     expect(await screen.findByText(/No network address found/)).toBeInTheDocument();
+  });
+});
+
+describe('StepDots', () => {
+  it('shows two running dots when the checker and tester are active', () => {
+    render(<StepDots task={task({ step: 'checker', activeSteps: ['checker', 'tester'], lastPassed: 'cleaner' })} />);
+    expect(screen.getByRole('img', { name: 'Checker: running' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Tester: running' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Approver: pending' })).toBeInTheDocument();
+  });
+
+  it('labels skipped steps and shows the approver as running', () => {
+    render(<StepDots task={task({ step: 'approver', activeSteps: ['approver'], skipped: ['checker', 'tester'], lastPassed: 'cleaner' })} />);
+    expect(screen.getByRole('img', { name: 'Checker: skipped' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Tester: skipped' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Approver: running' })).toBeInTheDocument();
+  });
+
+  it('renders an older task without the new fields', () => {
+    render(<StepDots task={task()} />);
+    expect(screen.getByRole('img', { name: 'Cleaner: running' })).toBeInTheDocument();
   });
 });

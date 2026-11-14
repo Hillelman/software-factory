@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { StepDots } from '@/components/StepDots';
 import { elapsedMs, formatDuration, formatTokens, STEP_LABEL } from '@/lib/format';
+import { activeStepsOf } from '@/lib/board';
 import type { TaskSummary } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -21,8 +22,9 @@ function stepLabel(task: TaskSummary): string {
   if (task.status === 'paused') return 'Paused';
   if (task.status === 'cancelled') return 'Cancelled';
   if (task.status === 'error') return task.lastError ? `Failed at ${STEP_LABEL[task.lastError.step]}` : 'Failed';
-  if (task.control === 'pause') return `${task.step ? STEP_LABEL[task.step] : 'Starting'} · pausing`;
-  return task.step ? STEP_LABEL[task.step] ?? task.step : 'Starting';
+  const active = activeStepsOf(task);
+  const name = active.length ? active.map((s) => STEP_LABEL[s] ?? s).join(' + ') : 'Starting';
+  return task.control === 'pause' ? `${name} · pausing` : name;
 }
 
 export function TaskCard({ task, now, notify, onNotifyChange, onOpen, showSession }: Props) {

@@ -110,3 +110,21 @@ describe('formatting', () => {
     expect(formatTokens(2_300_000)).toBe('2.3M');
   });
 });
+
+describe('parallel and skipped steps', () => {
+  it('handles a task fixture missing the new fields', () => {
+    const t = task();
+    expect(t.activeSteps).toBeUndefined();
+    expect(stepStates(t).cleaner).toBe('running');
+  });
+
+  it('marks skipped steps and concurrent active steps', () => {
+    expect(stepStates(task({ step: 'checker', activeSteps: ['checker', 'tester'], lastPassed: 'cleaner' }))).toMatchObject({ checker: 'running', tester: 'running' });
+    expect(stepStates(task({ step: 'approver', skipped: ['checker', 'tester'], lastPassed: 'cleaner' }))).toMatchObject({ checker: 'skipped', approver: 'running' });
+  });
+
+  it('records skipped steps in the timeline', () => {
+    const runs = timeline([{ ts: '2026-11-08T10:00:00.000Z', type: 'step_skipped', step: 'checker', run: 1 }]);
+    expect(runs[0]?.steps.find((s) => s.step === 'checker')?.state).toBe('skipped');
+  });
+});
