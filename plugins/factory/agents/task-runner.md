@@ -51,7 +51,6 @@ Project root: <root>
 Task file: <root>/.factory/tasks/<id>/task.md
 Worktree: <worktree>
 Base branch: <baseBranch>
-Report file: <root>/.factory/tasks/<id>/runs/<run>/<step>.md
 Commands: <commands object from config, as JSON>
 Dev server port: <5100 + 10 * (numeric part of id mod 100)>
 Input: <the previous step's JSON output>
