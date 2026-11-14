@@ -18,7 +18,7 @@ The factory never merges anything into `main`. When all tasks are done, it opens
 /factory:setup
 ```
 
-`/factory:setup` installs three short commands in `~/.claude/skills`: `/factory`, `/orchestrator` and `/create-pr`. They hand off to the plugin, so plugin updates keep applying. Run it again after an update if `/factory` says the commands are stale.
+`/factory:setup` installs three short commands in `~/.claude/skills`: `/factory`, `/orchestrator` and `/create-pr`. They hand off to the plugin, so plugin updates keep applying. Run it again after an update if `/factory` says the commands are stale. It also checks whether `gh pr create` and `gh pr merge` are allowed and, with your consent, adds those allow rules to `~/.claude/settings.json` (backup first; the factory only merges task PRs into the orchestrator branch, never into main). `factory permissions check|allow` does the same from the command line.
 
 **Prerequisites:**
 

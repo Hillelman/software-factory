@@ -10,6 +10,7 @@ import { git, run, mainRoot, currentBranch, childOptions, defaultBranch, dirtyFi
 import { nextTaskId, nextSessionId } from './ids.mjs';
 import { checkOnce } from './watchdog.mjs';
 import { detectCommands } from './detect.mjs';
+import { checkPermissions, allowPermissions } from './permissions.mjs';
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -50,6 +51,12 @@ Control
 
 Bare commands
   factory shims check|install [--force]       Install the /factory, /orchestrator and /create-pr user skills
+
+Permissions
+  factory permissions check [--json] [--project <dir>] [--home <dir>]
+                                              Report whether gh pr create/merge are allowed, denied or prompt
+  factory permissions allow [--project <dir>] [--home <dir>]
+                                              Add the gh pr create/merge allow rules to ~/.claude/settings.json
 
 Monitoring
   factory watchdog [--once] [--interval <s>] [--throttle <s>]
@@ -613,6 +620,30 @@ export function shims(action, flags, { home = os.homedir(), pluginRoot = PLUGIN_
   return 0;
 }
 
+// ---------- permissions ----------
+
+function permissions(action, flags) {
+  const opts = {};
+  if (typeof flags.home === 'string') opts.home = path.resolve(flags.home);
+  if (typeof flags.project === 'string') opts.project = path.resolve(flags.project);
+  if (action === 'check') {
+    const result = checkPermissions(opts);
+    if (flags.json) console.log(JSON.stringify(result, null, 2));
+    else {
+      for (const c of result.commands) console.log(`${c.command}: ${c.status}${c.rule ? ` (${c.rule} in ${c.file})` : ''}`);
+      for (const h of result.hooks) console.log(`PreToolUse hook (${h.matcher || 'all tools'}) in ${h.file}: ${h.commands.join(', ') || 'no command'}`);
+    }
+    return 0;
+  }
+  if (action === 'allow') {
+    const result = allowPermissions(opts);
+    console.log(JSON.stringify(result, null, 2));
+    for (const w of result.warnings) console.error(`factory: warning: ${w}`);
+    return 0;
+  }
+  throw new FactoryError('Usage: factory permissions check|allow');
+}
+
 // ---------- dispatch ----------
 
 export async function main(argv) {
@@ -649,6 +680,7 @@ export async function main(argv) {
       case 'watchdog': return await watchdog(flags);
       case 'dashboard': return await dashboard(rest);
       case 'shims': return shims(rest[0], flags);
+      case 'permissions': return permissions(rest[0], flags);
       case undefined: case 'help': case '--help': console.log(HELP); return 0;
       default: throw new FactoryError(`Unknown command "${cmd}". Run "factory help".`);
     }
