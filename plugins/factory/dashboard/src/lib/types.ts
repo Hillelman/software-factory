@@ -17,6 +17,9 @@ export interface TaskSummary {
   sessionId: string;
   status: Status;
   step: Step | null;
+  // Absent on tasks written before parallel and skipped steps existed.
+  activeSteps?: Step[];
+  skipped?: Step[];
   lastPassed: Step | null;
   run: number;
   maxRuns: number;

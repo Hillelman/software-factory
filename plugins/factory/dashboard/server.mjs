@@ -75,6 +75,8 @@ function summary(state, tokens) {
     sessionId: state.sessionId,
     status: state.status,
     step: state.step,
+    activeSteps: state.activeSteps?.length ? state.activeSteps : state.step ? [state.step] : [],
+    skipped: state.skipped ?? [],
     lastPassed: state.lastPassed,
     run: state.run,
     maxRuns: state.maxRuns,

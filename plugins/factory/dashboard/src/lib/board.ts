@@ -44,14 +44,18 @@ export function groupByColumn(tasks: TaskSummary[]): Record<ColumnId, TaskSummar
   return groups;
 }
 
-export type StepState = 'pending' | 'running' | 'passed' | 'failed';
+export type StepState = 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+
+export const activeStepsOf = (task: TaskSummary): Step[] => (task.activeSteps?.length ? task.activeSteps : task.step ? [task.step] : []);
 
 export function stepStates(task: TaskSummary): Record<Step, StepState> {
+  const active = activeStepsOf(task);
   const passedIdx = task.lastPassed ? STEPS.indexOf(task.lastPassed) : -1;
   const result = {} as Record<Step, StepState>;
   STEPS.forEach((step, i) => {
-    if (task.status === 'merged' || i <= passedIdx) result[step] = 'passed';
-    else if (task.step === step) result[step] = 'running';
+    if (task.skipped?.includes(step)) result[step] = 'skipped';
+    else if (task.status === 'merged' || i <= passedIdx) result[step] = 'passed';
+    else if (active.includes(step)) result[step] = 'running';
     else if (task.status === 'error' && task.lastError?.step === step && task.lastError.run === task.run) result[step] = 'failed';
     else result[step] = 'pending';
   });
@@ -88,6 +92,8 @@ export function timeline(events: FactoryEvent[]): TimelineRun[] {
     if (!entry) continue;
     if (e.type === 'step_started') {
       Object.assign(entry, { state: 'running', startedAt: e.ts, finishedAt: null, errorMessage: null });
+    } else if (e.type === 'step_skipped') {
+      Object.assign(entry, { state: 'skipped', startedAt: null, finishedAt: null, errorMessage: null });
     } else if (e.type === 'step_finished') {
       Object.assign(entry, { state: e.isApproved ? 'passed' : 'failed', finishedAt: e.ts, errorMessage: e.isApproved ? null : (e.errorMessage ?? null) });
     }
