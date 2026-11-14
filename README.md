@@ -61,7 +61,7 @@ main session (your model, effort, mode)
 
   | Step     | Model  | Responsibility                                                                                                                                                                     |
   | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | builder  | sonnet | Implements the task, or fixes the error it was given. It is the only step that writes feature code.                                                                                |
+  | builder  | opus   | Implements the task, or fixes the error it was given. It is the only step that writes feature code.                                                                                |
   | cleaner  | haiku  | Runs format, lint and typecheck, and removes dead code. It only makes mechanical, behavior-preserving fixes.                                                                       |
   | checker  | sonnet | Read-only security review of the task's diff: OWASP Top 10, secrets, authz, injection, dependencies.                                                                               |
   | tester   | sonnet | Picks the test layers the change needs: unit, integration, regression, E2E and UI/UX. It may add tests but never changes source code.                                              |
