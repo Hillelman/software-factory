@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- `factory unfinished --json` always prints `{ tasksInQueue, tasks }`, and the plain output ends with a count summary.
+- Windows: `bin/factory.cmd` launcher, and all child processes start with hidden consoles.
+- `/factory:setup` checks `gh pr create` and `gh pr merge` permissions and can allow them; new `factory permissions check|allow` (writes to `~/.claude/settings.json` with a timestamped backup). The factory still never merges into main or master.
+- The builder reports `hasCode`; documentation-only changes skip the checker and tester, which otherwise run in parallel (`factory step` may print `skip`, `factory end-step` may print `wait`, and `factory resume` adds `steps` when more than one must re-run).
+- The approver defaults to Opus in newly created configs.
+- Dashboard shows skipped and parallel steps.
+
 ## 0.1.0 — 2026-11-09
 
 First release.
