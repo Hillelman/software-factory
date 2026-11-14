@@ -169,3 +169,47 @@ test('bin/factory.cmd launches the node script with all arguments', () => {
   const cmd = fs.readFileSync(path.join(path.dirname(BIN), 'factory.cmd'), 'utf8');
   assert.ok(cmd.includes('node') && cmd.includes('%*'));
 });
+
+test('DEFAULT_CONFIG gives the approver opus, and so does its agent file', async () => {
+  const { DEFAULT_CONFIG } = await import('../lib/store.mjs');
+  assert.equal(DEFAULT_CONFIG.models.approver, 'opus');
+  const md = fs.readFileSync(path.resolve(path.dirname(BIN), '..', 'agents', 'approver.md'), 'utf8');
+  assert.match(md.split('---')[1], /^model: opus$/m);
+});
+
+function taskAtCleaner(name, hasCode, changedFile) {
+  const id = ok('task', 'create', '--title', name, '--file', writeTask(`${name}.md`));
+  const wt = ok('worktree', id);
+  ok('start', id);
+  ok('step', id, 'builder');
+  ok('end-step', id, 'builder', '--approved', 'true', '--has-code', hasCode);
+  fs.writeFileSync(path.join(wt, changedFile), 'change\n');
+  sh('git', ['add', changedFile], wt);
+  sh('git', ['commit', '-qm', `change ${changedFile}`], wt);
+  ok('step', id, 'cleaner');
+  assert.equal(ok('end-step', id, 'cleaner', '--approved', 'true'), 'next');
+  return id;
+}
+
+test('a docs-only change reported as hasCode false skips the checker and tester', () => {
+  const id = taskAtCleaner('docsonly', 'false', 'README.md');
+  assert.equal(ok('step', id, 'checker'), 'skip');
+  assert.equal(ok('step', id, 'tester'), 'skip');
+  assert.equal(ok('step', id, 'approver'), 'continue');
+  assert.ok(JSON.parse(ok('task', 'show', id, '--json')).events.some((e) => e.type === 'log' && /Skipping the checker and tester/.test(e.message)));
+});
+
+test('hasCode false with a changed .mjs file does not skip, and the mismatch is logged', () => {
+  const id = taskAtCleaner('mismatch', 'false', 'lib.mjs');
+  assert.equal(ok('step', id, 'checker'), 'continue');
+  assert.ok(JSON.parse(ok('task', 'show', id, '--json')).events.some((e) => /mismatch/.test(e.message ?? '')));
+});
+
+test('hasCode true with a docs-only diff does not skip, and the pair runs in parallel through the CLI', () => {
+  const id = taskAtCleaner('truecode', 'true', 'NOTES.md');
+  assert.equal(ok('step', id, 'checker'), 'continue');
+  assert.equal(ok('step', id, 'tester'), 'continue');
+  assert.equal(ok('end-step', id, 'checker', '--approved', 'true'), 'wait');
+  assert.equal(ok('end-step', id, 'tester', '--approved', 'false', '--error', 'broken'), 'retry');
+  assert.match(JSON.parse(ok('task', 'show', id, '--json')).state.lastError.message, /tester: broken/);
+});

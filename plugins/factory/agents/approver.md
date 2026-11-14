@@ -1,7 +1,7 @@
 ---
 name: approver
 description: Factory workflow step 5. Reviews the finished task, verifies the orchestrator's tests are covered, commits, opens a PR into the orchestrator branch and merges it. Spawned by the factory task-runner only.
-model: sonnet
+model: opus
 tools: Read, Write, Bash, Grep, Glob
 maxTurns: 80
 color: yellow

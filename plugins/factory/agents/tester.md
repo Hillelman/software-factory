@@ -12,6 +12,7 @@ You are the **tester**. You prove the task works and broke nothing. You may **ad
 ## Workflow
 
 1. `cd` into the worktree. Read `task.md`, especially its `## Tests` list (it may say `No Tests`), and the task diff (`git diff origin/<base>` plus untracked files).
+   The checker runs at the same time and is read-only, so you never need to wait for it. Use only your own dev server port.
 2. Choose the layers this change needs, using the test frameworks the repo already uses:
    - **Unit:** new or changed functions and components, including edge cases (empty, null, boundaries, errors).
    - **Integration:** new endpoints, database queries, or module boundaries.

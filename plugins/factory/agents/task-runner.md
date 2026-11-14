@@ -41,6 +41,7 @@ For each step:
    - `continue`: run the step.
    - `pause`: stop now and report `paused before <step>`. The state is already saved.
    - `cancel`: stop now and report `cancelled`. Do not touch git.
+   - `skip`: do not run the step, and do not call `end-step` for it (the builder's work was documentation only, or the step already passed in this run).
 2. Spawn the step with the Agent tool: `subagent_type: "factory:<step>"`, `model` from `models.<step>` in the config, foreground (wait for it). Use this prompt, filled in exactly:
 
 ```
@@ -57,12 +58,22 @@ Input: <the previous step's JSON output>
 ```
 
 3. Find the step's final JSON line: `{"isApproved": <bool>, "errorMessage": "<string>"}`. If it is missing or malformed, treat it as `{"isApproved": false, "errorMessage": "<step> returned no valid result: <first 300 chars of its reply>"}`.
-4. `factory end-step <id> <step> --approved <true|false> --error "<errorMessage>"` (add `--tokens <n>` if the Agent result reported a token total). It prints:
+4. `factory end-step <id> <step> --approved <true|false> --error "<errorMessage>"` (add `--tokens <n>` if the Agent result reported a token total). For the builder also add `--has-code <true|false>` from its JSON `hasCode` field; omit it if the field is missing. It prints:
    - `next`: pass this output to the next step.
+   - `wait`: the other parallel step has not reported yet (see below). Carry on.
    - `retry`: the run failed and a new one starts. Re-read the run number and go back to the builder with this output as its input.
    - `error`: the run budget is used up. Stop and report `error: <errorMessage>`.
    - `merged`: the approver merged the PR. Go to wrap-up.
    - `cancel`: stop and report `cancelled`.
+
+### Checker and tester run in parallel
+
+After the cleaner passes, handle the checker and tester together instead of one by one:
+
+1. Run `factory step <id> checker`, then `factory step <id> tester`. If either prints `pause` or `cancel`, stop as above (do not run the other one). A `skip` for both means they are skipped: go straight to the approver, with the cleaner's output as its input. A `skip` for just one (it already passed in this run) means you only run the other.
+2. Spawn the steps that printed `continue` as Agent calls in a **single message**, so they run at the same time. Both get the cleaner's output as `Input`.
+3. When they finish, run `factory end-step` for each one that ran (the first may print `wait`). A step with no valid JSON counts as failed, as in step 3 above, and the other step's result is still recorded.
+4. The signal of the second `end-step` decides: `next` goes to the approver (input `{"isApproved": true, "errorMessage": ""}`); `retry` goes back to the builder with `{"isApproved": false, "errorMessage": "<combined message>"}`, where the combined message is the failing steps' messages joined as `checker: <message> | tester: <message>` (just the failing steps); `error` and `cancel` as above. A `cancel` from either `end-step` means stop.
 
 Quote arguments safely: pass `--error` with a single-quoted string and escape any single quotes inside it.
 
