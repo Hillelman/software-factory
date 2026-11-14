@@ -38,10 +38,10 @@ Your prompt has the task header: task file, worktree, base branch, commands, and
 
 Do not write report or summary files. Your reply is your only output.
 
-End your reply with exactly one line of JSON, with nothing after it. The runner reads only this line; a reply without it counts as a failure:
+End your reply with exactly one line of JSON, with nothing after it. The runner reads only this line; a reply without it counts as a failure. It must include `hasCode`: `true` if you added or changed any code, configuration or test file, `false` only if every change is documentation or assets (for example `.md`, `.txt`, images). When unsure, report `true`; `false` lets the factory skip the checker and tester.
 
-{"isApproved": true, "errorMessage": ""}
+{"isApproved": true, "errorMessage": "", "hasCode": true}
 
 or, if you could not complete the work:
 
-{"isApproved": false, "errorMessage": "<what blocks the task, with file:line where possible>"}
+{"isApproved": false, "errorMessage": "<what blocks the task, with file:line where possible>", "hasCode": true}

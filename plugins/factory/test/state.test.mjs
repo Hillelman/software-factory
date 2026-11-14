@@ -132,3 +132,111 @@ test('restart resets the run budget from error, cancelled and paused', () => {
     assert.equal(s.restarts, 1);
   }
 });
+
+const afterCleaner = () => runSteps(sm.start(fresh(), T0), ['builder', 'cleaner']);
+const beginPair = (s) => sm.beginStep(sm.beginStep(s, 'checker', T0).state, 'tester', T0).state;
+const approved = { isApproved: true, errorMessage: '' };
+
+test('checker and tester can both be active after the cleaner passes', () => {
+  const s = beginPair(afterCleaner());
+  assert.deepEqual(s.activeSteps, ['checker', 'tester']);
+  assert.equal(s.step, 'checker');
+});
+
+test('both parallel steps approved leads to the approver', () => {
+  let s = beginPair(afterCleaner());
+  let r = sm.endStep(s, 'tester', approved, T0);
+  assert.equal(r.signal, 'wait');
+  r = sm.endStep(r.state, 'checker', approved, T0);
+  assert.equal(r.signal, 'next');
+  assert.equal(r.state.lastPassed, 'tester');
+  assert.deepEqual(r.state.activeSteps, []);
+  assert.equal(sm.beginStep(r.state, 'approver', T0).signal, 'continue');
+});
+
+test('a failing parallel step causes exactly one retry with its message', () => {
+  const s = beginPair(afterCleaner());
+  const waiting = sm.endStep(s, 'checker', approved, T0);
+  const r = sm.endStep(waiting.state, 'tester', { isApproved: false, errorMessage: 'tests broke' }, T0);
+  assert.equal(r.signal, 'retry');
+  assert.equal(r.state.run, 2);
+  assert.match(r.state.lastError.message, /tester: tests broke/);
+  assert.equal(r.state.lastPassed, null);
+  assert.deepEqual(r.state.stepResults, {});
+});
+
+test('both parallel steps failing give one retry with both messages', () => {
+  const s = beginPair(afterCleaner());
+  const first = sm.endStep(s, 'tester', { isApproved: false, errorMessage: 'bad test' }, T0);
+  assert.equal(first.signal, 'wait');
+  assert.equal(first.state.run, 1);
+  const r = sm.endStep(first.state, 'checker', { isApproved: false, errorMessage: 'xss' }, T0);
+  assert.equal(r.signal, 'retry');
+  assert.equal(r.state.run, 2);
+  assert.equal(r.state.lastError.message, 'checker: xss | tester: bad test');
+});
+
+test('a tester failure on the last run ends in error', () => {
+  const s = beginPair({ ...afterCleaner(), run: 2 });
+  const waiting = sm.endStep(s, 'checker', approved, T0);
+  const r = sm.endStep(waiting.state, 'tester', { isApproved: false, errorMessage: 'nope' }, T0);
+  assert.equal(r.signal, 'error');
+  assert.equal(r.state.status, 'error');
+});
+
+test('a pause requested during the parallel phase applies before the approver', () => {
+  let s = sm.beginStep(afterCleaner(), 'checker', T0).state;
+  s = sm.pause(s);
+  s = sm.beginStep(s, 'tester', T0).state;
+  assert.equal(s.control, 'pause');
+  s = sm.endStep(sm.endStep(s, 'checker', approved, T0).state, 'tester', approved, T0).state;
+  const r = sm.beginStep(s, 'approver', T0);
+  assert.equal(r.signal, 'pause');
+  assert.equal(r.state.status, 'paused');
+});
+
+test('a pause pending when the pair begins pauses before the checker, and cancel stops both', () => {
+  const paused = sm.beginStep(sm.pause(afterCleaner()), 'checker', T0);
+  assert.equal(paused.signal, 'pause');
+  const cancelled = sm.cancel(beginPair(afterCleaner()), T0);
+  assert.equal(sm.endStep(cancelled, 'checker', approved, T0).signal, 'cancel');
+  assert.equal(sm.endStep(cancelled, 'tester', approved, T0).signal, 'cancel');
+});
+
+test('skipping verification marks the checker and tester skipped and goes to the approver', () => {
+  let s = runSteps(sm.start(fresh(), T0), ['builder']);
+  s = sm.beginStep(s, 'cleaner', T0).state;
+  s = sm.endStep(s, 'cleaner', { ...approved, skipVerification: true }, T0).state;
+  assert.deepEqual(s.skipped, ['checker', 'tester']);
+  assert.equal(sm.beginStep(s, 'checker', T0).signal, 'skip');
+  assert.equal(sm.beginStep(s, 'tester', T0).signal, 'skip');
+  assert.equal(sm.beginStep(s, 'approver', T0).signal, 'continue');
+});
+
+test('the builder reports hasCode, defaulting to true', () => {
+  const run = (extra) => sm.endStep(sm.beginStep(sm.start(fresh(), T0), 'builder', T0).state, 'builder', { ...approved, ...extra }, T0).state;
+  assert.equal(run({}).hasCode, true);
+  assert.equal(run({ hasCode: false }).hasCode, false);
+});
+
+test('recover during the parallel phase only reruns the steps that have not passed', () => {
+  const s = beginPair(afterCleaner());
+  const partial = sm.endStep(s, 'checker', approved, T0).state;
+  const r = sm.resume(partial, { recover: true });
+  assert.deepEqual(r.steps, ['tester']);
+  assert.equal(r.step, 'tester');
+  assert.equal(sm.beginStep(r.state, 'checker', T0).signal, 'skip');
+  assert.equal(sm.beginStep(r.state, 'tester', T0).signal, 'continue');
+  assert.deepEqual(sm.resume(s, { recover: true }).steps, ['checker', 'tester']);
+});
+
+test('an old state file with a string step and no parallel fields still works', () => {
+  const { activeSteps, stepResults, skipped, hasCode, ...old } = afterCleaner();
+  const running = { ...old, step: 'checker' };
+  const r = sm.endStep(running, 'checker', approved, T0);
+  assert.equal(r.signal, 'next');
+  assert.equal(r.state.lastPassed, 'checker');
+  const t = sm.endStep(sm.beginStep(r.state, 'tester', T0).state, 'tester', approved, T0);
+  assert.equal(t.state.lastPassed, 'tester');
+  assert.equal(sm.beginStep(t.state, 'approver', T0).signal, 'continue');
+});

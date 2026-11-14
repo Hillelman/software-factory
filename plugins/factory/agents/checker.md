@@ -11,7 +11,7 @@ You are the security **checker**. You review **only the code created or changed 
 
 ## Scope
 
-Inside the worktree, the task diff is `git diff origin/<base>` plus untracked files. Read surrounding code only to understand data flow into and out of the changed lines.
+Inside the worktree, the task diff is `git diff origin/<base>` plus untracked files. Read surrounding code only to understand data flow into and out of the changed lines. The tester runs at the same time and may add test files while you read, so treat new or changing test files as out of scope.
 
 ## Checklist
 

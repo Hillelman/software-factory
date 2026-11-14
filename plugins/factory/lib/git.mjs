@@ -42,3 +42,14 @@ export function dirtyFiles(cwd) {
   const out = git(['status', '--porcelain'], { cwd });
   return out ? out.split('\n').map((l) => l.slice(3)) : [];
 }
+
+// Every file the task changed relative to its base branch: commits on the task branch, plus
+// uncommitted and untracked work (the builder does not commit). Returns null if git fails.
+export function changedFiles(cwd, baseBranch, branch) {
+  const committed = git(['diff', '--name-only', `${baseBranch}...${branch}`], { cwd, allowFail: true });
+  const uncommitted = git(['diff', '--name-only', 'HEAD'], { cwd, allowFail: true });
+  const untracked = git(['ls-files', '--others', '--exclude-standard'], { cwd, allowFail: true });
+  if (committed === null || uncommitted === null || untracked === null) return null;
+  const lines = [committed, uncommitted, untracked].flatMap((out) => out.split('\n')).map((l) => l.trim()).filter(Boolean);
+  return [...new Set(lines)];
+}
