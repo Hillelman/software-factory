@@ -75,6 +75,8 @@ function summary(state, tokens) {
     sessionId: state.sessionId,
     status: state.status,
     step: state.step,
+    activeSteps: state.activeSteps?.length ? state.activeSteps : state.step ? [state.step] : [],
+    skipped: state.skipped ?? [],
     lastPassed: state.lastPassed,
     run: state.run,
     maxRuns: state.maxRuns,
@@ -92,12 +94,23 @@ function summary(state, tokens) {
   };
 }
 
+// git is spawned only on the slow interval tick, not on every state request.
+let cachedBranch = null;
+function refreshBranch() {
+  try {
+    cachedBranch = currentBranch(root) ?? cachedBranch;
+  } catch {
+    // Keep the last known branch when git fails.
+  }
+}
+refreshBranch();
+
 function readState() {
   const tokens = tokenTotals();
   const tasks = store.taskIds().filter((id) => store.hasTask(id)).map((id) => summary(store.readTask(id), tokens));
   const sessions = store.sessionIds().map((id) => store.readSession(id)).filter(Boolean);
   return {
-    project: { name: path.basename(root), branch: currentBranch(root) },
+    project: { name: path.basename(root), branch: cachedBranch },
     currentSession: store.currentSessionId(),
     sessions: sessions.map(({ id, branch, startedAt, endedAt, tasks: ids }) => ({ id, branch, startedAt, endedAt, taskCount: ids.length })),
     steps: STEPS,
@@ -155,6 +168,7 @@ function watchTasks() {
   // Token totals come from transcripts outside .factory; refresh them periodically.
   let lastTokens = '';
   setInterval(() => {
+    refreshBranch();
     const next = JSON.stringify(tokenTotals());
     if (next !== lastTokens) {
       lastTokens = next;

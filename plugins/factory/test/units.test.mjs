@@ -8,6 +8,8 @@ import { highestInText, formatTaskId } from '../lib/ids.mjs';
 import { findStuck, checkOnce } from '../lib/watchdog.mjs';
 import { parseTranscript, tokensByTask, projectTranscriptDir } from '../lib/tokens.mjs';
 import { Store } from '../lib/store.mjs';
+import { childOptions } from '../lib/git.mjs';
+import { fileURLToPath } from 'node:url';
 
 test('parseTests reads a bullet list and the literal "No Tests"', () => {
   const md = '## Description\nx\n\n## Tests\n- [ ] filter hides done items\n2. empty list shows hint\n\n## Notes\nignored';
@@ -89,4 +91,22 @@ test('tokens are summed per task from subagent transcripts, deduped by message i
   assert.equal(totals['T-0002'].total, 230);
   assert.equal(totals['T-0002'].cacheRead, 2000);
   assert.equal(parseTranscript('not json\n').taskId, null);
+});
+
+test('child process options hide the Windows console', () => {
+  assert.equal(childOptions().windowsHide, true);
+  assert.deepEqual(childOptions({ cwd: 'x' }), { windowsHide: true, cwd: 'x' });
+});
+
+test('every spawn/execFile/execFileSync call passes windowsHide', () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const libDir = path.join(root, 'lib');
+  const files = [...fs.readdirSync(libDir).filter((f) => f.endsWith('.mjs')).map((f) => path.join(libDir, f)), path.join(root, 'dashboard', 'server.mjs')];
+  for (const file of files) {
+    const src = fs.readFileSync(file, 'utf8');
+    for (const m of src.matchAll(/\b(?:spawn|execFile|execFileSync)\(/g)) {
+      const call = src.slice(m.index, m.index + 400);
+      assert.ok(/windowsHide|childOptions/.test(call), `${path.basename(file)}: ${m[0]} without windowsHide`);
+    }
+  }
 });

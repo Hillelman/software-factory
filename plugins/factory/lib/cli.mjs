@@ -6,10 +6,11 @@ import { fileURLToPath } from 'node:url';
 import * as sm from './state.mjs';
 import { FactoryError } from './state.mjs';
 import { Store, DEFAULT_CONFIG } from './store.mjs';
-import { git, run, mainRoot, currentBranch, defaultBranch, dirtyFiles } from './git.mjs';
+import { git, run, mainRoot, currentBranch, childOptions, defaultBranch, dirtyFiles, changedFiles } from './git.mjs';
 import { nextTaskId, nextSessionId } from './ids.mjs';
 import { checkOnce } from './watchdog.mjs';
 import { detectCommands } from './detect.mjs';
+import { checkPermissions, allowPermissions } from './permissions.mjs';
 
 const PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -34,9 +35,11 @@ Tasks
 
 Task runner protocol
   factory start <id>                          backlog -> in_progress
-  factory step <id> <step>                    Prints continue | pause | cancel
-  factory end-step <id> <step> --approved true|false [--error <msg>] [--tokens <n>]
-                                              Prints next | retry | merged | error | cancel
+  factory step <id> <step>                    Prints continue | pause | cancel | skip
+  factory end-step <id> <step> --approved true|false [--error <msg>] [--tokens <n>] [--has-code true|false]
+                                              Prints next | wait | retry | merged | error | cancel
+                                              (--has-code is for the builder and defaults to true;
+                                              wait: the checker/tester pair is not finished yet)
   factory approve <id> --pr <url>             Approver records the PR before merging
   factory log <id> <message>
   factory worktree <id>                       Create (or reuse) the task worktree; prints its path
@@ -48,6 +51,12 @@ Control
 
 Bare commands
   factory shims check|install [--force]       Install the /factory, /orchestrator and /create-pr user skills
+
+Permissions
+  factory permissions check [--json] [--project <dir>] [--home <dir>]
+                                              Report whether gh pr create/merge are allowed, denied or prompt
+  factory permissions allow [--project <dir>] [--home <dir>]
+                                              Add the gh pr create/merge allow rules to ~/.claude/settings.json
 
 Monitoring
   factory watchdog [--once] [--interval <s>] [--throttle <s>]
@@ -275,8 +284,14 @@ function ready() {
 function unfinished(flags) {
   const store = openStore();
   const tasks = allTasks(store).filter((t) => !['merged', 'cancelled'].includes(t.status));
-  if (flags.json) console.log(JSON.stringify(tasks.map(({ id, title, status, step, run, sessionId }) => ({ id, title, status, step, run, sessionId }))));
-  else for (const t of tasks) console.log(`${t.id}  ${t.status.padEnd(11)} ${t.sessionId}  ${t.title}`);
+  const count = (status) => tasks.filter((t) => t.status === status).length;
+  const tasksInQueue = { backlog: count('backlog'), inProgress: count('in_progress'), paused: count('paused'), approved: count('approved'), errors: count('error') };
+  if (flags.json) {
+    console.log(JSON.stringify({ tasksInQueue, tasks: tasks.map(({ id, title, status, step, run, sessionId }) => ({ id, title, status, step, run, sessionId })) }));
+    return 0;
+  }
+  for (const t of tasks) console.log(`${t.id}  ${t.status.padEnd(11)} ${t.sessionId}  ${t.title}`);
+  console.log(`${tasks.length} unfinished: ${tasksInQueue.backlog} backlog, ${tasksInQueue.inProgress} in progress, ${tasksInQueue.paused} paused, ${tasksInQueue.approved} approved, ${tasksInQueue.errors} errors`);
   return 0;
 }
 
@@ -324,26 +339,51 @@ function start(id) {
 
 function step(id, name) {
   const { signal, state } = transition(id, (s) => sm.beginStep(s, name, now()), ({ signal, state }) =>
-    signal === 'continue' ? { type: 'step_started', step: name, run: state.run } : { type: signal === 'pause' ? 'paused' : 'cancel_seen', step: name, run: state.run });
+    signal === 'continue' ? { type: 'step_started', step: name, run: state.run }
+      : signal === 'skip' ? { type: 'step_skipped', step: name, run: state.run }
+      : { type: signal === 'pause' ? 'paused' : 'cancel_seen', step: name, run: state.run });
   console.log(signal);
   if (signal === 'pause') console.error(`${id} paused before ${name} (run ${state.run}). Resume with /factory:resume ${id}.`);
   return 0;
+}
+
+const NON_CODE_FILE = /(\.(md|mdx|txt|rst|png|jpe?g|gif|svg|webp)|^(LICENSE|CHANGELOG)[^/]*)$/i;
+
+const isNonCodeFile = (file) => NON_CODE_FILE.test(file.split('/').pop());
+
+// Decides whether the checker and tester can be skipped. Anything uncertain counts as code.
+function verificationDecision(store, s) {
+  if (s.hasCode !== false) return { skip: false, reason: 'the builder reported code changes' };
+  const files = changedFiles(store.path('worktrees', s.id), s.baseBranch, s.branch);
+  if (files === null) return { skip: false, reason: 'the builder reported no code, but the diff could not be read' };
+  if (files.length === 0) return { skip: false, reason: 'the builder reported no code, but the diff is empty' };
+  const code = files.filter((f) => !isNonCodeFile(f));
+  if (code.length) return { skip: false, reason: `mismatch: the builder reported no code, but the diff changes ${code.join(', ')}` };
+  return { skip: true, reason: `the builder reported no code and the diff only changes non-code files (${files.join(', ')})` };
 }
 
 function endStep(id, name, flags) {
   const approvedFlag = requireValue(flags, 'approved', 'true or false');
   if (!['true', 'false'].includes(approvedFlag)) throw new FactoryError('--approved must be true or false.');
   const isApproved = approvedFlag === 'true';
+  if (flags['has-code'] !== undefined && !['true', 'false'].includes(flags['has-code'])) throw new FactoryError('--has-code must be true or false.');
+  const hasCode = flags['has-code'] !== 'false';
   const errorMessage = typeof flags.error === 'string' ? flags.error : '';
   const tokens = Number(flags.tokens) || 0;
+  const store = openStore();
+  let decision = null;
   const { signal, state } = transition(
     id,
     (s) => {
-      const r = sm.endStep(s, name, { isApproved, errorMessage }, now());
+      decision = name === 'cleaner' && isApproved && s.status === 'in_progress' ? verificationDecision(store, s) : null;
+      const r = sm.endStep(s, name, { isApproved, errorMessage, hasCode, skipVerification: decision?.skip === true }, now());
       return { ...r, state: { ...r.state, tokens: { reported: (r.state.tokens?.reported ?? 0) + tokens } } };
     },
-    ({ signal, state }) => ({ type: 'step_finished', step: name, run: isApproved || signal === 'error' ? state.run : state.run - 1, isApproved, errorMessage, signal }),
+    ({ signal, state }) => ({ type: 'step_finished', step: name, run: signal === 'retry' ? state.run - 1 : state.run, isApproved, errorMessage, signal }),
   );
+  if (decision && signal === 'next') {
+    store.appendEvent(id, { type: 'log', message: `${decision.skip ? 'Skipping the checker and tester' : 'Running the checker and tester'}: ${decision.reason}.` });
+  }
   console.log(signal);
   if (signal === 'error') console.error(`${id} failed ${state.maxRuns} runs. Last error: ${state.lastError.message}`);
   return 0;
@@ -424,12 +464,12 @@ function pause(id) {
 
 function resume(id, flags) {
   const recover = Boolean(flags.recover);
-  const { state, step: from, before } = transition(id, (s) => sm.resume(s, { recover }), { type: 'resumed', recover });
+  const { state, step: from, steps, before } = transition(id, (s) => sm.resume(s, { recover }), { type: 'resumed', recover });
   if (before.status === 'in_progress' && !recover) {
     console.log(`${id} pause request withdrawn; it keeps running.`);
     return 0;
   }
-  console.log(JSON.stringify({ id, run: state.run, step: from, respawn: true }));
+  console.log(JSON.stringify({ id, run: state.run, step: from, ...(steps.length > 1 ? { steps } : {}), respawn: true }));
   return 0;
 }
 
@@ -505,7 +545,7 @@ function pidAlive(pid) {
 
 function openUrl(url) {
   const [cmd, args] = process.platform === 'darwin' ? ['open', [url]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : ['xdg-open', [url]];
-  spawn(cmd, args, { stdio: 'ignore', detached: true }).on('error', () => {}).unref();
+  spawn(cmd, args, childOptions({ stdio: 'ignore', detached: true })).on('error', () => {}).unref();
 }
 
 async function dashboard(positional) {
@@ -531,10 +571,10 @@ async function dashboard(positional) {
   }
   if (action !== 'start') throw new FactoryError('Usage: factory dashboard start|stop|url|open');
   const logFd = fs.openSync(store.path('dashboard.log'), 'a');
-  const child = spawn(process.execPath, [path.join(PLUGIN_ROOT, 'dashboard', 'server.mjs'), '--root', store.root, '--port', String(store.config().port)], {
+  const child = spawn(process.execPath, [path.join(PLUGIN_ROOT, 'dashboard', 'server.mjs'), '--root', store.root, '--port', String(store.config().port)], childOptions({
     detached: true,
     stdio: ['ignore', logFd, logFd],
-  });
+  }));
   child.unref();
   for (let i = 0; i < 50; i++) {
     await new Promise((r) => setTimeout(r, 100));
@@ -580,6 +620,30 @@ export function shims(action, flags, { home = os.homedir(), pluginRoot = PLUGIN_
   return 0;
 }
 
+// ---------- permissions ----------
+
+function permissions(action, flags) {
+  const opts = {};
+  if (typeof flags.home === 'string') opts.home = path.resolve(flags.home);
+  if (typeof flags.project === 'string') opts.project = path.resolve(flags.project);
+  if (action === 'check') {
+    const result = checkPermissions(opts);
+    if (flags.json) console.log(JSON.stringify(result, null, 2));
+    else {
+      for (const c of result.commands) console.log(`${c.command}: ${c.status}${c.rule ? ` (${c.rule} in ${c.file})` : ''}`);
+      for (const h of result.hooks) console.log(`PreToolUse hook (${h.matcher || 'all tools'}) in ${h.file}: ${h.commands.join(', ') || 'no command'}`);
+    }
+    return 0;
+  }
+  if (action === 'allow') {
+    const result = allowPermissions(opts);
+    console.log(JSON.stringify(result, null, 2));
+    for (const w of result.warnings) console.error(`factory: warning: ${w}`);
+    return 0;
+  }
+  throw new FactoryError('Usage: factory permissions check|allow');
+}
+
 // ---------- dispatch ----------
 
 export async function main(argv) {
@@ -616,6 +680,7 @@ export async function main(argv) {
       case 'watchdog': return await watchdog(flags);
       case 'dashboard': return await dashboard(rest);
       case 'shims': return shims(rest[0], flags);
+      case 'permissions': return permissions(rest[0], flags);
       case undefined: case 'help': case '--help': console.log(HELP); return 0;
       default: throw new FactoryError(`Unknown command "${cmd}". Run "factory help".`);
     }

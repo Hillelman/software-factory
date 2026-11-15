@@ -5,7 +5,7 @@ An agentic software factory, packaged as a Claude Code plugin. It works like thi
 - You describe a feature, and it asks you only the questions that matter.
 - It splits the work into tasks that run **in parallel**, each in its own git worktree.
 - Every task goes through the same five steps: **builder → cleaner → checker → tester → approver**.
-- When a task passes, its PR is merged into your **orchestrator branch**.
+- When a task passes, its PR is merged into your **orchestrator branch** (not `main`).
 - A live kanban board, which you can also open on your phone, shows where everything is.
 
 The factory never merges anything into `main`. When all tasks are done, it opens one PR for you to review and merge.
@@ -18,12 +18,13 @@ The factory never merges anything into `main`. When all tasks are done, it opens
 /factory:setup
 ```
 
-`/factory:setup` installs three short commands in `~/.claude/skills`: `/factory`, `/orchestrator` and `/create-pr`. They hand off to the plugin, so plugin updates keep applying. Run it again after an update if `/factory` says the commands are stale.
+`/factory:setup` installs three short commands at the user level in `~/.claude/skills`: `/factory`, `/orchestrator` and `/create-pr`. They hand off to the plugin, so plugin updates keep applying. Run it again after an update if `/factory` says the commands are stale. It also checks whether the agent can `gh pr create` and `gh pr merge`. The factory only merges task PRs into the orchestrator branch and never into `main` or `master`; the final PR is yours to merge. If you decline, you merge each task PR by hand. `factory permissions check|allow` does the same from the command line.
 
 **Prerequisites:**
 
 - Node 20+, git, and the [GitHub CLI](https://cli.github.com) (`gh auth login`).
 - A GitHub remote.
+- On Windows, use `plugins/factory/bin/factory.cmd`, which runs the `factory` script through Node. From PowerShell, call it as `& "<plugin>\bin\factory.cmd" unfinished --json` or put `bin` on your `PATH` and run `factory.cmd unfinished`.
 - Any language or stack. The factory detects your format, lint, typecheck and test commands and asks you to confirm them.
 
 ## Commands
@@ -51,12 +52,12 @@ Actions that aren't allowed are refused with a clear message. For example, pausi
 main session (your model, effort, mode)
 └── orchestrator ── splits work, opens dashboard, spawns runners
     ├── task-runner T-0001 (same model)          worktree .factory/worktrees/T-0001
-    │   └── builder → cleaner → checker → tester → approver   (sonnet / haiku)
+    │   └── builder → cleaner → checker ∥ tester → approver   (sonnet / haiku / opus)
     ├── task-runner T-0002 …
     └── … all in parallel
 ```
 
-- **Step contract:** each step returns `{ "isApproved": boolean, "errorMessage": string }`. Any `false` sends the task back to the **builder** with that error. A task gets at most **2 runs**, then its status becomes **Error**.
+- **Step contract:** each step returns `{ "isApproved": boolean, "errorMessage": string }`. Any `false` sends the task back to the **builder** with that error. The **checker** and **tester** run in parallel, and both must pass. If the builder reports `hasCode: false` (documentation or assets only) and the diff has no code files, both are skipped. A task gets at most **2 runs**, then its status becomes **Error**.
 - **What each step does:**
 
   | Step     | Model  | Responsibility                                                                                                                                                                     |
@@ -65,7 +66,7 @@ main session (your model, effort, mode)
   | cleaner  | haiku  | Runs format, lint and typecheck, and removes dead code. It only makes mechanical, behavior-preserving fixes.                                                                       |
   | checker  | sonnet | Read-only security review of the task's diff: OWASP Top 10, secrets, authz, injection, dependencies.                                                                               |
   | tester   | sonnet | Picks the test layers the change needs: unit, integration, regression, E2E and UI/UX. It may add tests but never changes source code.                                              |
-  | approver | sonnet | Checks that the task's Tests are covered (or the task says `No Tests`), commits, opens the PR into the orchestrator branch and merges it. A merge conflict counts as a failed run. |
+  | approver | opus   | Checks that the task's Tests are covered (or the task says `No Tests`), commits, opens the PR into the orchestrator branch and merges it. A merge conflict counts as a failed run. |
 
 - **State:** everything lives in `.factory/`, which is added to `.gitignore`. The `factory` CLI is the only thing that writes it, and it refuses illegal transitions, so a crashed session can be resumed. Task ids (`T-0001`, …) are never reused, even across sessions.
 - **After a merge:** the runner runs `factory wrapup`, which removes the worktree and deletes the merged branch.
@@ -73,7 +74,7 @@ main session (your model, effort, mode)
 
 ### Model overrides
 
-Step models live in `.factory/config.json` (`models.builder` and so on). Task runners always inherit the session's model and effort.
+Step models live in `.factory/config.json` (`models.builder` and so on). The approver defaults to Opus in newly created configs; existing configs keep their value. Task runners always inherit the session's model and effort.
 
 ## Dashboard
 
@@ -100,6 +101,8 @@ When a step runs longer than `stuck_minutes` (default 7, set in the plugin setti
 
 - **Permissions:** background agents can't show permission prompts. The orchestrator offers to add an allowlist (git, gh, `factory` and your toolchain) to `.claude/settings.local.json`.
 - **Parallelism:** Claude Code allows about 20 concurrent subagents per session, so any tasks beyond that wait in Backlog.
+- **Windows consoles:** the factory starts its child processes hidden. If a console window still flashes up, make sure you run the CLI through `bin/factory.cmd` and update the plugin.
+- **Unfinished tasks:** `factory unfinished --json` prints `{ "tasksInQueue": { backlog, inProgress, paused, approved, errors }, "tasks": [...] }`, even when nothing is left. The plain output ends with a count summary.
 - **Pause:** a pause takes effect between steps. A running step is never interrupted halfway through.
 - **Cancel:** cancelling doesn't close a PR that the approver already opened.
 

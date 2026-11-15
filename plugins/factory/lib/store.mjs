@@ -8,7 +8,7 @@ export const DEFAULT_CONFIG = {
   maxRuns: 2,
   stuckMinutes: 7,
   port: 4317,
-  models: { builder: 'sonnet', cleaner: 'haiku', checker: 'sonnet', tester: 'sonnet', approver: 'sonnet' },
+  models: { builder: 'sonnet', cleaner: 'haiku', checker: 'sonnet', tester: 'sonnet', approver: 'opus' },
   commands: { format: null, lint: null, typecheck: null, test: null, e2e: null, dev: null },
 };
 
