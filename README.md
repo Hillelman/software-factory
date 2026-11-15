@@ -47,16 +47,14 @@ Actions that aren't allowed are refused with a clear message. For example, pausi
 
 ## How it works
 
-<img width="1024" height="791" alt="Screenshot 2026-11-09 at 9 32 13" src="https://github.com/user-attachments/assets/9e5dbb24-9949-40f2-8e22-d73e57385931" />
-
-
 ```
 main session (your model, effort, mode)
-└── orchestrator ── splits work, opens dashboard, spawns runners
-    ├── task-runner T-0001 (same model)          worktree .factory/worktrees/T-0001
-    │   └── builder → cleaner → checker ∥ tester → approver   (sonnet / haiku / opus)
-    ├── task-runner T-0002 …
-    └── … all in parallel
+└── orchestrator (splits work, opens dashboard, spawns runners)
+    ├── task-runner T-0001 (same model using worktree in .factory/worktrees/T-0001)
+    │   └── builder → cleaner → checker ∥ tester → approver
+    ├── task-runner T-0002 (orchestrator can run it in parallel or secuential)
+    │   └── builder → cleaner → checker ∥ tester → approver
+    ├── create-pr (creates PR into the orchestrator's branch, never to main)
 ```
 
 - **Step contract:** each step returns `{ "isApproved": boolean, "errorMessage": string }`. Any `false` sends the task back to the **builder** with that error. The **checker** and **tester** run in parallel, and both must pass. If the builder reports `hasCode: false` (documentation or assets only) and the diff has no code files, both are skipped. A task gets at most **2 runs**, then its status becomes **Error**.
