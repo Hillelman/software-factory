@@ -8,7 +8,9 @@ An agentic software factory, packaged as a Claude Code plugin. It works like thi
 - When a task passes, its PR is merged into your **orchestrator branch** (not `main`).
 - A live kanban board, which you can also open on your phone, shows where everything is.
 
-The factory never merges anything into `main`. When all tasks are done, it opens one PR for you to review and merge.
+<img width="1764" height="1132" alt="Screenshot 2026-11-10 at 19 22 24" src="https://github.com/user-attachments/assets/db98bfa4-0e11-4754-9885-d6f1ac2f827d" />
+
+The factory only merges task PRs into the orchestrator branch and never into `main` or `master`; the final PR is yours to review and merge.
 
 ## Install
 
@@ -18,7 +20,7 @@ The factory never merges anything into `main`. When all tasks are done, it opens
 /factory:setup
 ```
 
-`/factory:setup` installs three short commands at the user level in `~/.claude/skills`: `/factory`, `/orchestrator` and `/create-pr`. They hand off to the plugin, so plugin updates keep applying. Run it again after an update if `/factory` says the commands are stale. It also checks whether the agent can `gh pr create` and `gh pr merge`. The factory only merges task PRs into the orchestrator branch and never into `main` or `master`; the final PR is yours to merge. If you decline, you merge each task PR by hand. `factory permissions check|allow` does the same from the command line.
+`/factory:setup` installs three short commands at the user level in `~/.claude/skills`: `/factory`, `/orchestrator` and `/create-pr`. They hand off to the plugin, so plugin updates keep applying. Run it again after an update if `/factory` says the commands are stale. It also checks whether the agent can `gh pr create` and `gh pr merge`, if you decline, you merge each task PR by hand. `factory permissions check|allow` does the same from the command line.
 
 **Prerequisites:**
 
