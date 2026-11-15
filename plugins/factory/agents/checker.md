@@ -38,7 +38,7 @@ Go through each item for the changed code:
 
 ## Output
 
-Do not write report or summary files. Your reply is your only output.
+Your reply is your only output.
 
 End your reply with exactly one line of JSON, with nothing after it. The runner reads only this line; a reply without it counts as a failure:
 

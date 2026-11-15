@@ -19,14 +19,14 @@ The factory CLI is `factory` (or `node "${CLAUDE_PLUGIN_ROOT}/bin/factory"` if i
 ## Review
 
 1. `cd` into the worktree. Read `task.md`. You only run after the earlier steps approved, so the tests already pass.
-2. Run `factory tests <id>`. If it prints `none`, the task has **No Tests**: skip the coverage check and say so in the PR. Otherwise, find the test in the diff or the repo that covers each listed item. Any uncovered item means reject.
+2. Make sure the task's purpose is full filled and the code follows the highest coding standards for the specific language.
 3. Read the full diff (`git diff origin/<base>` plus untracked files). Reject scope creep, such as unrelated refactors or files outside the task's purpose. Also reject leftover debug code and requirements from `task.md` that are not met.
 
 ## Commit, PR and merge
 
 4. Stage explicit paths only (never `git add -A` or `git add .`), and never stage `.env*`, secrets or build artifacts. Commit with a Conventional Commit message: `<type>(<scope>): <summary>`, a short body, and this trailer as the last line:
 
-       Factory-Task: <id>
+   Factory-Task: <id>
 
 5. `git fetch origin <base>`, then `git rebase origin/<base>`.
    - On a conflict, run `git rebase --abort` and **reject** with the conflicting files and a summary of each conflicting hunk, so the builder can resolve them.
@@ -45,7 +45,7 @@ The factory CLI is `factory` (or `node "${CLAUDE_PLUGIN_ROOT}/bin/factory"` if i
 
 ## Output
 
-Do not write report or summary files. Your reply is your only output.
+Your reply is your only output.
 
 End your reply with exactly one line of JSON, with nothing after it. The runner reads only this line; a reply without it counts as a failure:
 

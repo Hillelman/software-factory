@@ -5,7 +5,7 @@ An agentic software factory, packaged as a Claude Code plugin. It works like thi
 - You describe a feature, and it asks you only the questions that matter.
 - It splits the work into tasks that run **in parallel**, each in its own git worktree.
 - Every task goes through the same five steps: **builder → cleaner → checker → tester → approver**.
-- When a task passes, its PR is merged into your **orchestrator branch**.
+- When a task passes, its PR is merged into your **orchestrator branch** (not `main`).
 - A live kanban board, which you can also open on your phone, shows where everything is.
 
 The factory never merges anything into `main`. When all tasks are done, it opens one PR for you to review and merge.
@@ -18,7 +18,7 @@ The factory never merges anything into `main`. When all tasks are done, it opens
 /factory:setup
 ```
 
-`/factory:setup` installs three short commands in `~/.claude/skills`: `/factory`, `/orchestrator` and `/create-pr`. They hand off to the plugin, so plugin updates keep applying. Run it again after an update if `/factory` says the commands are stale. It also checks whether `gh pr create` and `gh pr merge` are allowed and, with your consent, adds those allow rules to `~/.claude/settings.json` (`Bash(gh pr create:*)` and `Bash(gh pr merge:*)`, with a timestamped backup first). The factory only merges task PRs into the orchestrator branch and never into `main` or `master`; the final PR is yours to merge. If you decline, you merge each task PR by hand. `factory permissions check|allow` does the same from the command line.
+`/factory:setup` installs three short commands at the user level in `~/.claude/skills`: `/factory`, `/orchestrator` and `/create-pr`. They hand off to the plugin, so plugin updates keep applying. Run it again after an update if `/factory` says the commands are stale. It also checks whether the agent can `gh pr create` and `gh pr merge`. The factory only merges task PRs into the orchestrator branch and never into `main` or `master`; the final PR is yours to merge. If you decline, you merge each task PR by hand. `factory permissions check|allow` does the same from the command line.
 
 **Prerequisites:**
 
