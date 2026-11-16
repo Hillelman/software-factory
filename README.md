@@ -47,26 +47,45 @@ Actions that aren't allowed are refused with a clear message. For example, pausi
 
 ## How it works
 
-```
-main session (your model, effort, mode)
-└── orchestrator (splits work, opens dashboard, spawns runners)
-    ├── task-runner T-0001 (same model using worktree in .factory/worktrees/T-0001)
-    │   └── builder → cleaner → checker ∥ tester → approver
-    ├── task-runner T-0002 (orchestrator can run it in parallel or secuential)
-    │   └── builder → cleaner → checker ∥ tester → approver
-    ├── create-pr (creates PR into the orchestrator's branch, never to main)
+```mermaid
+flowchart TD
+    BRANCH(["New branch"]) --> START["/factory"]
+    START --> Q["Refine requirements"]
+    Q --> ORCH["Orchestrator"]
+    ORCH --> RUNNER
+    subgraph RUNNER["Task Runner (worktree)"]
+        BUILD[builder]
+        BUILD --> CLEAN[cleaner]
+        CLEAN --> CHECK[checker]
+        CLEAN --> TEST[tester]
+        CHECK --> APPROVE[approver]
+        TEST --> APPROVE
+        APPROVE -. rejected .-> BUILD
+        APPROVE --> MERGE["Merge<br/>into orchestrator's branch"]
+    end
+
+    MERGE --> PR["/create-pr"]
+    PR --> REVIEW(["PR ready for your review"])
 ```
 
-- **Step contract:** each step returns `{ "isApproved": boolean, "errorMessage": string }`. Any `false` sends the task back to the **builder** with that error. The **checker** and **tester** run in parallel, and both must pass. If the builder reports `hasCode: false` (documentation or assets only) and the diff has no code files, both are skipped. A task gets at most **2 runs**, then its status becomes **Error**.
-- **What each step does:**
+- The user creates a new branch, sets the model and effort according to the work to be done (used by the orchestrator).
+- /factory <idea>, the user's broad idea (no need for much details).
+- The factory asks relevant questions, refines the requirements and prepares the plan.
+- Once the user approves, the orchestrator splits the work into tasks and opens the dashboard.
+- It starts one task-runner per task, it decides if they will be executed in parallel or sequential.
+- Each task-runner creates its own worktree and runs builder → cleaner → checker & tester → approver. If any step rejects the work, it goes back to the builder. A task gets at most **2 runs**, then its status becomes **Error**.
+- Once the approver approves, the task merges into the orchestrator's branch.
+- When all tasks have merged, the user runs /create-pr to open a PR into main for you to review.
 
-  | Step     | Model  | Responsibility                                                                                                                                                                     |
-  | -------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | builder  | opus   | Implements the task, or fixes the error it was given. It is the only step that writes feature code.                                                                                |
-  | cleaner  | haiku  | Runs format, lint and typecheck, and removes dead code. It only makes mechanical, behavior-preserving fixes.                                                                       |
-  | checker  | sonnet | Read-only security review of the task's diff: OWASP Top 10, secrets, authz, injection, dependencies.                                                                               |
-  | tester   | sonnet | Picks the test layers the change needs: unit, integration, regression, E2E and UI/UX. It may add tests but never changes source code.                                              |
-  | approver | opus   | Checks that the task's Tests are covered (or the task says `No Tests`), commits, opens the PR into the orchestrator branch and merges it. A merge conflict counts as a failed run. |
+**What each step does:**
+
+| Step     | Model  | Responsibility                                                                                                                                                                     |
+| -------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| builder  | opus   | Implements the task, or fixes the error it was given. It is the only step that writes feature code.                                                                                |
+| cleaner  | haiku  | Runs format, lint and typecheck, and removes dead code. It only makes mechanical, behavior-preserving fixes.                                                                       |
+| checker  | sonnet | Read-only security review of the task's diff: OWASP Top 10, secrets, authz, injection, dependencies.                                                                               |
+| tester   | sonnet | Picks the test layers the change needs: unit, integration, regression, E2E and UI/UX. It may add tests but never changes source code.                                              |
+| approver | opus   | Checks that the task's Tests are covered (or the task says `No Tests`), commits, opens the PR into the orchestrator branch and merges it. A merge conflict counts as a failed run. |
 
 - **State:** everything lives in `.factory/`, which is added to `.gitignore`. The `factory` CLI is the only thing that writes it, and it refuses illegal transitions, so a crashed session can be resumed. Task ids (`T-0001`, …) are never reused, even across sessions.
 - **After a merge:** the runner runs `factory wrapup`, which removes the worktree and deletes the merged branch.
